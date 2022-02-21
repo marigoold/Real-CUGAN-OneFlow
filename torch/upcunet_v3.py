@@ -260,7 +260,7 @@ class UpCunet2x(nn.Module):  # 完美tile，全程无损
         self.unet2 = UNet2(in_channels, out_channels, deconv=False)
 
     def forward(self, x, tile_mode=0):  # 1.7G
-        
+
         n, c, h0, w0 = x.shape
         if(tile_mode == 0):  # 不tile
             ph = ((h0 - 1) // 2 + 1) * 2
@@ -678,14 +678,15 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
 
 
 class RealWaifuUpScaler(object):
-    def __init__(self, scale, weight_path, half, device):
-        weight = torch.load(weight_path, map_location="cpu")
+    def __init__(self, scale, weight_path, half, device, pretrained):
         self.model = eval("UpCunet%sx" % scale)()
+        if pretrained:
+            weight = torch.load(weight_path, map_location="cpu")
+            self.model.load_state_dict(weight, strict=True)
         if(half == True):
             self.model = self.model.half().to(device)
         else:
             self.model = self.model.to(device)
-        self.model.load_state_dict(weight, strict=True)
         self.model.eval()
         self.half = half
         self.device = device
@@ -709,54 +710,85 @@ class RealWaifuUpScaler(object):
         return result
 
 
+def str2bool(v):
+    return str(v).lower() in ("true", "t", "1")
+
+
 if __name__ == "__main__":
     # inference_img
     import time
     import cv2
     import sys
     from time import time as ttime
-    #for weight_path, scale in [("weights_v3/up2x-latest-denoise3x.pth", 2), ("weights_v3/up3x-latest-denoise3x.pth", 3), ("weights_v3/up4x-latest-denoise3x.pth", 4)]:
-    for weight_path, scale in [("weights_v3/up2x-latest-denoise3x.pth", 2)]:        
+    import argparse
+
+    parser = argparse.ArgumentParser(description='ArcFace PyTorch to onnx')
+    parser.add_argument('--graph', type=str2bool,
+                        default="False", help='use graph')
+    parser.add_argument('--fp16', type=str2bool,
+                        default="False", help='use fp16')
+    parser.add_argument('--real_data', type=str2bool, default="False",
+                        help='inference with real data')
+    parser.add_argument('--pretrain', type=str2bool, default="False",
+                        help='use pretrained model')
+    args = parser.parse_args()
+
+    # for weight_path, scale in [("weights_v3/up2x-latest-denoise3x.pth", 2), ("weights_v3/up3x-latest-denoise3x.pth", 3), ("weights_v3/up4x-latest-denoise3x.pth", 4)]:
+    for weight_path, scale in [("weights_v3/up2x-latest-denoise3x.pth", 2)]:
         for tile_mode in [0]:
+
             upscaler2x = RealWaifuUpScaler(
-                scale, weight_path, half=False, device="cuda:0")
-            input_dir = "%s/input_dir1" % root_path
-            output_dir = "%s/opt-dir-all-test" % root_path
-            print(input_dir, output_dir)
-            os.makedirs(output_dir, exist_ok=True)
-            for name in os.listdir(input_dir):
-                print(name)
-                tmp = name.split(".")
-                inp_path = os.path.join(input_dir, name)
-                suffix = tmp[-1]
-                prefix = ".".join(tmp[:-1])
-                tmp_path = os.path.join(root_path, "tmp", "%s.%s" % (
-                    int(time.time() * 1000000), suffix))
-                print(inp_path, tmp_path)
-                # 支持中文路径
-                # os.link(inp_path, tmp_path)#win用硬链接
-                os.symlink(inp_path, tmp_path)  # linux用软链接
-                frame = cv2.imread(tmp_path)[:, :, [2, 1, 0]]
+                scale, weight_path,  half=args.fp16, device="cuda:0", pretrained=args.pretrain)
+
+            if args.real_data:
+
+                input_dir = "%s/input_dir1" % root_path
+                output_dir = "%s/opt-dir-all-test" % root_path
+                print(input_dir, output_dir)
+                os.makedirs(output_dir, exist_ok=True)
+                for name in os.listdir(input_dir):
+                    print(name)
+                    tmp = name.split(".")
+                    inp_path = os.path.join(input_dir, name)
+                    suffix = tmp[-1]
+                    prefix = ".".join(tmp[:-1])
+                    tmp_path = os.path.join(root_path, "tmp", "%s.%s" % (
+                        int(time.time() * 1000000), suffix))
+                    print(inp_path, tmp_path)
+                    # 支持中文路径
+                    # os.link(inp_path, tmp_path)#win用硬链接
+                    os.symlink(inp_path, tmp_path)  # linux用软链接
+                    frame = cv2.imread(tmp_path)[:, :, [2, 1, 0]]
+                    for _ in range(10):
+                        result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
+                    t0 = ttime()
+                    for _ in range(1000):
+                        result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
+                    t1 = ttime()
+                    print("torch use real data : ",  t1 - t0)
+                    tmp_opt_path = os.path.join(root_path, "tmp", "%s.%s" % (
+                        int(time.time() * 1000000), suffix))
+                    cv2.imwrite(tmp_opt_path, result)
+                    n = 0
+                    while(1):
+                        if(n == 0):
+                            suffix = "_%sx_tile%s.png" % (scale, tile_mode)
+                        else:
+                            suffix = "_%sx_tile%s_%s.png" % (scale, tile_mode, n)
+                        if(os.path.exists(os.path.join(output_dir, prefix + suffix)) == False):
+                            break
+                        else:
+                            n += 1
+                    final_opt_path = os.path.join(output_dir, prefix + suffix)
+                    os.rename(tmp_opt_path, final_opt_path)
+                    os.remove(tmp_path)
+            else:
+                frame = np.random.randint(0, 255, size=[256, 256, 3])
                 for _ in range(10):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
                 t0 = ttime()
                 for _ in range(1000):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
                 t1 = ttime()
-                print(prefix, "done", t1 - t0)
-                tmp_opt_path = os.path.join(root_path, "tmp", "%s.%s" % (
-                    int(time.time() * 1000000), suffix))
-                cv2.imwrite(tmp_opt_path, result)
-                n = 0
-                while(1):
-                    if(n == 0):
-                        suffix = "_%sx_tile%s.png" % (scale, tile_mode)
-                    else:
-                        suffix = "_%sx_tile%s_%s.png" % (scale, tile_mode, n)
-                    if(os.path.exists(os.path.join(output_dir, prefix + suffix)) == False):
-                        break
-                    else:
-                        n += 1
-                final_opt_path = os.path.join(output_dir, prefix + suffix)
-                os.rename(tmp_opt_path, final_opt_path)
-                os.remove(tmp_path)
+                print("torch use synthetic data : ",  t1 - t0)
+      

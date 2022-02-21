@@ -1,3 +1,4 @@
+from graph import EvalGraph
 import oneflow
 from oneflow import nn as nn
 from oneflow.nn import functional as F
@@ -6,7 +7,7 @@ import sys
 import numpy as np
 root_path = os.path.abspath('.')
 sys.path.append(root_path)
-from graph import  EvalGraph
+
 
 class SEBlock(nn.Module):
     def __init__(self, in_channels, reduction=8, bias=False):
@@ -421,7 +422,8 @@ class UpCunet3x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         x_crop.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(x_crop, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        x_crop, dim=(2, 3), keepdim=True)
                 se_mean0 += tmp_se_mean
                 n_patch += 1
                 tmp_dict[i][j] = (tmp0, x_crop)
@@ -440,7 +442,8 @@ class UpCunet3x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         tmp_x2.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(tmp_x2, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        tmp_x2, dim=(2, 3), keepdim=True)
                 se_mean1 += tmp_se_mean
                 tmp_dict[i][j] = (opt_unet1, tmp_x1, tmp_x2)
         se_mean1 /= n_patch
@@ -457,7 +460,8 @@ class UpCunet3x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         tmp_x3.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(tmp_x3, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        tmp_x3, dim=(2, 3), keepdim=True)
                 se_mean0 += tmp_se_mean
                 tmp_dict[i][j] = (opt_unet1, tmp_x1, tmp_x2, tmp_x3)
         se_mean0 /= n_patch
@@ -474,7 +478,8 @@ class UpCunet3x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         tmp_x4.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(tmp_x4, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        tmp_x4, dim=(2, 3), keepdim=True)
                 se_mean1 += tmp_se_mean
                 tmp_dict[i][j] = (opt_unet1, tmp_x1, tmp_x4)
         se_mean1 /= n_patch
@@ -565,7 +570,8 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         x_crop.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(x_crop, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        x_crop, dim=(2, 3), keepdim=True)
                 se_mean0 += tmp_se_mean
                 n_patch += 1
                 tmp_dict[i][j] = (tmp0, x_crop)
@@ -584,7 +590,8 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         tmp_x2.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(tmp_x2, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        tmp_x2, dim=(2, 3), keepdim=True)
                 se_mean1 += tmp_se_mean
                 tmp_dict[i][j] = (opt_unet1, tmp_x1, tmp_x2)
         se_mean1 /= n_patch
@@ -601,7 +608,8 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         tmp_x3.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(tmp_x3, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        tmp_x3, dim=(2, 3), keepdim=True)
                 se_mean0 += tmp_se_mean
                 tmp_dict[i][j] = (opt_unet1, tmp_x1, tmp_x2, tmp_x3)
         se_mean0 /= n_patch
@@ -618,7 +626,8 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
                     tmp_se_mean = oneflow.mean(
                         tmp_x4.float(), dim=(2, 3), keepdim=True)
                 else:
-                    tmp_se_mean = oneflow.mean(tmp_x4, dim=(2, 3), keepdim=True)
+                    tmp_se_mean = oneflow.mean(
+                        tmp_x4, dim=(2, 3), keepdim=True)
                 se_mean1 += tmp_se_mean
                 tmp_dict[i][j] = (opt_unet1, tmp_x1, tmp_x4)
         se_mean1 /= n_patch
@@ -654,17 +663,16 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
 
 
 class RealWaifuUpScaler(object):
-    def __init__(self, scale, weight_path, half, device,graph=False):
-        weight = oneflow.load(weight_path)
+    def __init__(self, scale, weight_path, half, device, graph=False, pretrained=True):
         self.model = eval("UpCunet%sx" % scale)()
-
+        if pretrained:
+            weight = oneflow.load(weight_path)
+            self.model.load_state_dict(weight, strict=True)
         self.model = self.model.to(device)
-        self.model.load_state_dict(weight, strict=True)
         self.model.eval()
         if graph:
-            self.model=EvalGraph(self.model,fp16=half)
+            self.model = EvalGraph(self.model, fp16=half)
         self.device = device
-
 
     def np2tensor(self, np_frame):
         return oneflow.tensor(np.transpose(np_frame, (2, 0, 1))).unsqueeze(0).to(self.device) / 255.
@@ -678,6 +686,10 @@ class RealWaifuUpScaler(object):
             result = self.tensor2np(self.model(tensor))
         return result
 
+def str2bool(v):
+    return str(v).lower() in ("true", "t", "1")
+
+
 
 
 
@@ -690,52 +702,70 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='ArcFace PyTorch to onnx')
-    parser.add_argument('--graph', type=bool, default=False, help='use graph')
-    parser.add_argument('--fp16', type=bool, default=False, help='use fp16')
+    parser.add_argument('--graph', type=str2bool, default="False", help='use graph')
+    parser.add_argument('--fp16', type=str2bool, default="False", help='use fp16')
+    parser.add_argument('--real_data', type=str2bool, default="False",
+                         help='inference with real data')
+    parser.add_argument('--pretrain', type=str2bool, default="False",
+                         help='use pretrained model')
     args = parser.parse_args()
 
     for weight_path, scale in [("weights/up2x-latest-denoise3x", 2)]:
         for tile_mode in [0]:
             upscaler2x = RealWaifuUpScaler(
-                scale, weight_path, half=args.fp16, device="cuda:0",graph=args.graph)
-            input_dir = "%s/input_dir1" % root_path
-            output_dir = "%s/opt-dir-all-test" % root_path
-            print(input_dir, output_dir)
-            os.makedirs(output_dir, exist_ok=True)
-            for name in os.listdir(input_dir):
-                print(name)
-                tmp = name.split(".")
-                inp_path = os.path.join(input_dir, name)
-                suffix = tmp[-1]
-                prefix = ".".join(tmp[:-1])
-                tmp_path = os.path.join(root_path, "tmp", "%s.%s" % (
-                    int(time.time() * 1000000), suffix))
-                print(inp_path, tmp_path)
-                # 支持中文路径
-                # os.link(inp_path, tmp_path)#win用硬链接
-                os.symlink(inp_path, tmp_path)  # linux用软链接
-                frame = cv2.imread(tmp_path)[:, :, [2, 1, 0]]
+                scale, weight_path, half=args.fp16, device="cuda:0", graph=args.graph, pretrained=args.pretrain)
 
-                for _ in range(10): 
+            if args.real_data:
+                input_dir = "%s/input_dir1" % root_path
+                output_dir = "%s/opt-dir-all-test" % root_path
+                print(input_dir, output_dir)
+                os.makedirs(output_dir, exist_ok=True)
+                for name in os.listdir(input_dir):
+                    print(name)
+                    tmp = name.split(".")
+                    inp_path = os.path.join(input_dir, name)
+                    suffix = tmp[-1]
+                    prefix = ".".join(tmp[:-1])
+                    tmp_path = os.path.join(root_path, "tmp", "%s.%s" % (
+                        int(time.time() * 1000000), suffix))
+                    print(inp_path, tmp_path)
+                    # 支持中文路径
+                    # os.link(inp_path, tmp_path)#win用硬链接
+                    os.symlink(inp_path, tmp_path)  # linux用软链接
+                    frame = cv2.imread(tmp_path)[:, :, [2, 1, 0]]
+
+                    for _ in range(10):
+                        result = upscaler2x(frame, tile_mode=tile_mode)[
+                            :, :, ::-1]
+                    t0 = ttime()
+                    for _ in range(1000):
+                        result = upscaler2x(frame, tile_mode=tile_mode)[
+                            :, :, ::-1]
+                    t1 = ttime()
+                    print("oneflow use real data : ",  t1 - t0)
+                    tmp_opt_path = os.path.join(root_path, "tmp", "%s.%s" % (
+                        int(time.time() * 1000000), suffix))
+                    cv2.imwrite(tmp_opt_path, result)
+                    n = 0
+                    while(1):
+                        if(n == 0):
+                            suffix = "_%sx_tile%s.png" % (scale, tile_mode)
+                        else:
+                            suffix = "_%sx_tile%s_%s.png" % (
+                                scale, tile_mode, n)
+                        if(os.path.exists(os.path.join(output_dir, prefix + suffix)) == False):
+                            break
+                        else:
+                            n += 1
+                    final_opt_path = os.path.join(output_dir, prefix + suffix)
+                    os.rename(tmp_opt_path, final_opt_path)
+                    os.remove(tmp_path)
+            else:
+                frame = np.random.randint(0, 255, size=[256, 256, 3])
+                for _ in range(10):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
                 t0 = ttime()
                 for _ in range(1000):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
                 t1 = ttime()
-                print(prefix, "done", t1 - t0)
-                tmp_opt_path = os.path.join(root_path, "tmp", "%s.%s" % (
-                    int(time.time() * 1000000), suffix))
-                cv2.imwrite(tmp_opt_path, result)
-                n = 0
-                while(1):
-                    if(n == 0):
-                        suffix = "_%sx_tile%s.png" % (scale, tile_mode)
-                    else:
-                        suffix = "_%sx_tile%s_%s.png" % (scale, tile_mode, n)
-                    if(os.path.exists(os.path.join(output_dir, prefix + suffix)) == False):
-                        break
-                    else:
-                        n += 1
-                final_opt_path = os.path.join(output_dir, prefix + suffix)
-                os.rename(tmp_opt_path, final_opt_path)
-                os.remove(tmp_path)
+                print("oneflow use synthetic data : ",  t1 - t0)
