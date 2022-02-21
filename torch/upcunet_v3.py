@@ -737,7 +737,8 @@ if __name__ == "__main__":
                 # os.link(inp_path, tmp_path)#win用硬链接
                 os.symlink(inp_path, tmp_path)  # linux用软链接
                 frame = cv2.imread(tmp_path)[:, :, [2, 1, 0]]
-                result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
+                for _ in range(10):
+                    result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
                 t0 = ttime()
                 for _ in range(1000):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]

@@ -654,15 +654,15 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
 
 
 class RealWaifuUpScaler(object):
-    def __init__(self, scale, weight_path, half, device):
+    def __init__(self, scale, weight_path, half, device,graph=False):
         weight = oneflow.load(weight_path)
         self.model = eval("UpCunet%sx" % scale)()
 
         self.model = self.model.to(device)
         self.model.load_state_dict(weight, strict=True)
         self.model.eval()
-        self.model=EvalGraph(self.model)
-        self.half = half
+        if graph:
+            self.model=EvalGraph(self.model,fp16=half)
         self.device = device
 
 
@@ -687,11 +687,17 @@ if __name__ == "__main__":
     import cv2
     import sys
     from time import time as ttime
-    #for weight_path, scale in [("weights_v3/up2x-latest-denoise3x.pth", 2), ("weights_v3/up3x-latest-denoise3x.pth", 3), ("weights_v3/up4x-latest-denoise3x.pth", 4)]:
+    import argparse
+
+    parser = argparse.ArgumentParser(description='ArcFace PyTorch to onnx')
+    parser.add_argument('--graph', type=bool, default=False, help='use graph')
+    parser.add_argument('--fp16', type=bool, default=False, help='use fp16')
+    args = parser.parse_args()
+
     for weight_path, scale in [("weights/up2x-latest-denoise3x", 2)]:
         for tile_mode in [0]:
             upscaler2x = RealWaifuUpScaler(
-                scale, weight_path, half=True, device="cuda:0")
+                scale, weight_path, half=args.fp16, device="cuda:0",graph=args.graph)
             input_dir = "%s/input_dir1" % root_path
             output_dir = "%s/opt-dir-all-test" % root_path
             print(input_dir, output_dir)
@@ -709,7 +715,9 @@ if __name__ == "__main__":
                 # os.link(inp_path, tmp_path)#win用硬链接
                 os.symlink(inp_path, tmp_path)  # linux用软链接
                 frame = cv2.imread(tmp_path)[:, :, [2, 1, 0]]
-                result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
+
+                for _ in range(10): 
+                    result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
                 t0 = ttime()
                 for _ in range(1000):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]

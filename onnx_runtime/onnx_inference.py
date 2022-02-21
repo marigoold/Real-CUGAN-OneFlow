@@ -60,30 +60,16 @@ class onnx_inference:
         return net_out
 
 
-#data = np.array(np.random.randn(224, 224, 3))
-# img = cv2.imread("test_img/test-img.jpg")
-# model = onnx_inference('weights/x2_v3.onnx')
-# print(model.check(img))
+data = np.array(np.random.randn(224, 224, 3))
+img = cv2.imread("test_img/test-img.jpg")
+model = onnx_inference('weights/x2_v3.onnx')
+print(model.check(img))
 
-# out = model.forward(img)
+out = model.forward(img)
 
-# t0 = ttime()
-# for _ in range(1000):
-#     result = model.forward(img)
-# t1 = ttime()
-# print("done", t1 - t0)
-
-# cv2.imwrite("out.png",out)
-
-
-
-#print(out)
-
-data = np.array(np.random.randn(1,3,224, 224))
-sess = rt.InferenceSession('weights/x2_v3.onnx',providers=['CUDAExecutionProvider'])
-input_name = sess.get_inputs()[0].name
-label_name = sess.get_outputs()[0].name
-
-pred_onx = sess.run([label_name], {input_name:data.astype(np.float32)})[0]
-print(pred_onx)
-print(np.argmax(pred_onx))
+t0 = ttime()
+for _ in range(1000):
+    result = model.forward(img)
+t1 = ttime()
+print("done", t1 - t0)
+cv2.imwrite("out.png",out)
