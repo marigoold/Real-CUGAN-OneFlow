@@ -109,3 +109,8 @@ ENV/
 .mypy_cache/
 
 .DS_Store
+
+
+#vscode
+
+.vscode/
