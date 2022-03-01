@@ -1,3 +1,5 @@
+from ast import arg
+import profile
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
@@ -225,6 +227,7 @@ class UNet2(nn.Module):
         x2 = self.conv1_down(x1)
         x2 = F.leaky_relu(x2, 0.1, inplace=True)
         x2 = self.conv2.conv(x2)
+        
         return x1, x2
 
     def forward_b(self, x2):  # conv234结尾有se
@@ -267,13 +270,18 @@ class UpCunet2x(nn.Module):  # 完美tile，全程无损
             pw = ((w0 - 1) // 2 + 1) * 2
             x = F.pad(x, (18, 18 + pw - w0, 18, 18 + ph - h0),
                       'reflect')  # 需要保证被2整除
+            torch.cuda.nvtx.range_push("unet1")
             x = self.unet1.forward(x)
+            torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_push("unet2")
             x0 = self.unet2.forward(x)
+            torch.cuda.nvtx.range_pop()
             x1 = F.pad(x, (-20, -20, -20, -20))
-            x = torch.add(x0, x1)
+            x = torch.add(x, x)
             if (w0 != pw or h0 != ph):
                 x = x[:, :, :h0 * 2, :w0 * 2]
-            return x
+            
+            return x0
         elif(tile_mode == 1):  # 对长边减半
             if(w0 >= h0):
                 crop_size_w = ((w0-1)//4*4+4)//2  # 减半后能被2整除，所以要先被4整除
@@ -678,8 +686,9 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
 
 
 class RealWaifuUpScaler(object):
-    def __init__(self, scale, weight_path, half, device, pretrained):
+    def __init__(self, scale, weight_path, half, device, real_data=False,profile=False,pretrained=False):
         self.model = eval("UpCunet%sx" % scale)()
+        self.real_data=real_data
         if pretrained:
             weight = torch.load(weight_path, map_location="cpu")
             self.model.load_state_dict(weight, strict=True)
@@ -689,25 +698,49 @@ class RealWaifuUpScaler(object):
             self.model = self.model.to(device)
         self.model.eval()
         self.half = half
+        self.profile=profile
         self.device = device
-
-    def np2tensor(self, np_frame):
-        if (self.half == False):
-            return torch.from_numpy(np.transpose(np_frame, (2, 0, 1))).unsqueeze(0).to(self.device).float() / 255
+        if profile:
+            self.total_iter=10
         else:
-            return torch.from_numpy(np.transpose(np_frame, (2, 0, 1))).unsqueeze(0).to(self.device).half() / 255
+            self.total_iter=1000
+
+
+    def np2tensor(self,np_frame):
+        if self.real_data:
+            np_frame=torch.from_numpy(np.transpose(np_frame, (2, 0, 1))).unsqueeze(0).to(self.device) / 255.
+        else:
+            np_frame = torch.from_numpy(np_frame).to(self.device) / 255.
+        if (self.half == False):
+            return np_frame.float() 
+        else:
+            return np_frame.half() 
 
     def tensor2np(self, tensor):
-        if (self.half == False):
-            return (np.transpose((tensor.data.squeeze() * 255.0).round().clamp_(0, 255).byte().cpu().numpy(), (1, 2, 0)))
+        if self.half :
+            tensor = tensor.float()
+        if self.real_data:
+            return  (np.transpose((tensor.data.squeeze().float()*255.0).round().clamp_(0, 255).cpu().numpy(), (1, 2, 0)))
         else:
-            return (np.transpose((tensor.data.squeeze().float()*255.0).round().clamp_(0, 255).byte().cpu().numpy(), (1, 2, 0)))
+            return   (np.transpose((tensor*255.0).round().clamp_(0, 255).cpu().numpy(), (0,3, 2, 1)))
+       
+
+
 
     def __call__(self, frame, tile_mode):
         with torch.no_grad():
             tensor = self.np2tensor(frame)
-            result = self.tensor2np(self.model(tensor, tile_mode))
+            for _ in range (10):
+                result =self.model(tensor)
+            result = self.tensor2np(result)
+            t0 = ttime()           
+            for _ in range (self.total_iter):
+                result =self.model(tensor)           
+            result = self.tensor2np(result)
+            t1 = ttime()
+            print("torch use synthetic data : ",  t1 - t0)
         return result
+
 
 
 def str2bool(v):
@@ -721,7 +754,7 @@ if __name__ == "__main__":
     import sys
     from time import time as ttime
     import argparse
-
+    
     parser = argparse.ArgumentParser(description='ArcFace PyTorch to onnx')
     parser.add_argument('--graph', type=str2bool,
                         default="False", help='use graph')
@@ -731,6 +764,10 @@ if __name__ == "__main__":
                         help='inference with real data')
     parser.add_argument('--pretrain', type=str2bool, default="False",
                         help='use pretrained model')
+    parser.add_argument('--profile', type=str2bool, default="False",
+                         help='use for profile') 
+    parser.add_argument('--batch_size', type=int, default=1,
+                         help='batch size,only support synthetic data')                         
     args = parser.parse_args()
 
     # for weight_path, scale in [("weights_v3/up2x-latest-denoise3x.pth", 2), ("weights_v3/up3x-latest-denoise3x.pth", 3), ("weights_v3/up4x-latest-denoise3x.pth", 4)]:
@@ -738,7 +775,7 @@ if __name__ == "__main__":
         for tile_mode in [0]:
 
             upscaler2x = RealWaifuUpScaler(
-                scale, weight_path,  half=args.fp16, device="cuda:0", pretrained=args.pretrain)
+                scale, weight_path,  half=args.fp16, device="cuda:0",real_data=args.real_data ,pretrained=args.pretrain,profile=args.profile)
 
             if args.real_data:
 
@@ -783,12 +820,6 @@ if __name__ == "__main__":
                     os.rename(tmp_opt_path, final_opt_path)
                     os.remove(tmp_path)
             else:
-                frame = np.random.randint(0, 255, size=[256, 256, 3])
-                for _ in range(10):
+                frame = np.random.randint(0, 255, size=[args.batch_size,3,256, 256])
+                for _ in range(1):
                     result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
-                t0 = ttime()
-                for _ in range(1000):
-                    result = upscaler2x(frame, tile_mode=tile_mode)[:, :, ::-1]
-                t1 = ttime()
-                print("torch use synthetic data : ",  t1 - t0)
-      
