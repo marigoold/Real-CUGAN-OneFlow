@@ -5,19 +5,20 @@ import numpy as np
 import os
 import cv2
 from time import time as ttime
-
+import oneflow2onnx
 
 
 class onnx_inference:
+
     def __init__(self, model_path, cpu=False):
         self.model_file = model_path
         # providers = None will use available provider, for onnxruntime-gpu it will be "CUDAExecutionProvider"
-        self.providers =  ['CUDAExecutionProvider']
+        self.providers = ['CUDAExecutionProvider']
 
         self.input_mean = 0.0
         self.input_std = 255
         self.session = None
-        
+
     # input_size is (w,h), return error message, return None if success
     def check(self, test_img=None):
         #default is cfat
@@ -25,8 +26,8 @@ class onnx_inference:
             return "model_path not exists"
         print('use onnx-model:', self.model_file)
         try:
-            session = onnxruntime.InferenceSession(
-                self.model_file, providers=self.providers)
+            session = onnxruntime.InferenceSession(self.model_file,
+                                                   providers=self.providers)
         except:
             return "load onnx failed"
         input_cfg = session.get_inputs()[0]
@@ -52,11 +53,15 @@ class onnx_inference:
 
     def forward(self, img):
         input_size = img.shape[:2]
-        blob = cv2.dnn.blobFromImage(img, 1.0/self.input_std, input_size,
-                                      (self.input_mean, self.input_mean, self.input_mean), swapRB=False)
-        net_out = self.session.run(self.output_names, {self.input_name:blob})[0]
-        net_out=np.squeeze(net_out)
-        net_out = np.transpose(net_out*255, (1, 2, 0))
+        blob = cv2.dnn.blobFromImage(
+            img,
+            1.0 / self.input_std,
+            input_size, (self.input_mean, self.input_mean, self.input_mean),
+            swapRB=False)
+        net_out = self.session.run(self.output_names,
+                                   {self.input_name: blob})[0]
+        net_out = np.squeeze(net_out)
+        net_out = np.transpose(net_out * 255, (1, 2, 0))
         return net_out
 
 
@@ -72,4 +77,4 @@ for _ in range(1000):
     result = model.forward(img)
 t1 = ttime()
 print("done", t1 - t0)
-cv2.imwrite("out.png",out)
+cv2.imwrite("out.png", out)

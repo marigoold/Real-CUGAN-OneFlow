@@ -1,5 +1,6 @@
 from ast import arg
 import profile
+from turtle import forward
 
 from torch import tensor
 from graph import EvalGraph
@@ -800,7 +801,7 @@ class RealWaifuUpScaler(object):
         return result
 
 
-def get_cunet(scale, denoise=None):
+def get_cunet(scale, denoise=None, return_weight_path=False):
     assert scale in [2, 3, 4]
     if scale == 2:
         assert denoise in ['conservative', "1", "2", "3", None]
@@ -818,9 +819,12 @@ def get_cunet(scale, denoise=None):
         None: "no-denoise",
         "conservative": "conservative"
     }[denoise]
-    state_dict = flow.load(f"oneflow/weights/up{scale}x-latest-{denoise}")
+    weight_path = f"oneflow/weights/up{scale}x-latest-{denoise}"
+    state_dict = flow.load(weight_path)
     model.load_state_dict(state_dict=state_dict, strict=True)
-    return model
+    if not return_weight_path:
+        return model
+    return model, weight_path
 
 
 def str2bool(v):

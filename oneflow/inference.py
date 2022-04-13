@@ -1,4 +1,5 @@
-from upcunet_v3 import RealWaifuUpScaler
+from upcunet_v3 import RealWaifuUpScaler, np2tensor, tensor2np
+from model import UpScalarGraph
 import cv2
 import argparse
 from pathlib import Path
@@ -31,8 +32,18 @@ if __name__ == "__main__":
         conv_cudnn_search=False,
     )
 
+    upscaler = UpScalarGraph(
+        scale=args.scale,
+        denoise=args.denoise,
+        device="cuda",
+        fp16=args.fp16,
+        tensorrt=False,
+        conv_cudnn_search=False,
+    )
+
     if not Path(args.input).exists():
         raise FileExistsError("The input image doesn't exist! ")
     image = cv2.imread(args.input)
-    result = upscaler(image, tile_mode=0)
+
+    result = tensor2np(upscaler(np2tensor(image, "cuda")))
     cv2.imwrite(args.output, result)
