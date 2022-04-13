@@ -3,9 +3,7 @@
 import torch
 from torch2trt import torch2trt
 from upcunet_v3 import *
-import time
 import cv2
-import sys
 from time import time as ttime
 
 path_module = "../torch/weights_v3/up2x-latest-denoise3x.pth"
@@ -24,8 +22,10 @@ def tensor2np( tensor):
     return (np.transpose((tensor.data.squeeze().float()*255.0).round().clamp_(0, 255).byte().cpu().numpy(), (1, 2, 0)))
 
 
-image_path="../torch/input_dir1/2.png"
+# image_path="../torch/input_dir1/2.png"
+image_path="../test-img.jpeg"
 image = cv2.imread(image_path)[:, :, [2, 1, 0]]
+image = cv2.imread(image_path)
 
 x=np2tensor(image).cuda()
 y = model(x)

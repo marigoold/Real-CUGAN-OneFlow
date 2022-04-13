@@ -1,7 +1,10 @@
 from ast import arg
 import profile
+
+from torch import tensor
 from graph import EvalGraph
 import oneflow
+import oneflow as flow
 from oneflow import nn as nn
 from oneflow.nn import functional as F
 
@@ -84,7 +87,7 @@ class UNet1(nn.Module):
 
         if deconv:
             self.conv_bottom = nn.ConvTranspose2d(64, out_channels, 4, 2, 3)
-            
+
         else:
             self.conv_bottom = nn.Conv2d(64, out_channels, 3, 1, 0)
 
@@ -414,7 +417,7 @@ class UpCunet3x(nn.Module):  # 完美tile，全程无损
         self.unet1 = UNet1x3(in_channels, out_channels, deconv=True)
         self.unet2 = UNet2(in_channels, out_channels, deconv=False)
 
-    def forward(self, x, tile_mode):  # 1.7G
+    def forward(self, x, tile_mode=0):  # 1.7G
         n, c, h0, w0 = x.shape
         if (tile_mode == 0):  # 不tile
             ph = ((h0 - 1) // 4 + 1) * 4
@@ -574,7 +577,7 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
         self.ps = nn.PixelShuffle(2)
         self.conv_final = nn.Conv2d(64, 12, 3, 1, padding=0, bias=True)
 
-    def forward(self, x, tile_mode):
+    def forward(self, x, tile_mode=0):
         n, c, h0, w0 = x.shape
         x00 = x
         if (tile_mode == 0):  # 不tile
@@ -739,24 +742,26 @@ class RealWaifuUpScaler(object):
 
     def __init__(self,
                  scale,
-                 weight_path,
+                 denoise,
                  half,
                  device,
                  real_data=False,
                  graph=False,
+                 tensorrt=False,
                  profile=False,
-                 pretrained=False,
                  conv_cudnn_search=False):
-        self.model = eval("UpCunet%sx" % scale)()
+        self.model = get_cunet(scale, denoise)
         self.real_data = real_data
-        if pretrained:
-            weight = oneflow.load(weight_path)
-            self.model.load_state_dict(weight, strict=True)
         self.model = self.model.to(device)
-
         self.model.eval()
         if graph:
-            self.model = EvalGraph(self.model, fp16=half,conv_cudnn_search=conv_cudnn_search)
+            self.model = EvalGraph(self.model,
+                                   fp16=half,
+                                   conv_cudnn_search=conv_cudnn_search)
+            if tensorrt:
+                self.model.config.enable_tensorrt()
+                if half:
+                    self.model.config.tensorrt.use_fp16()
         self.device = device
         if profile:
             self.total_iter = 10
@@ -793,6 +798,29 @@ class RealWaifuUpScaler(object):
             t1 = ttime()
             print("oneflow use synthetic data : ", t1 - t0)
         return result
+
+
+def get_cunet(scale, denoise=None):
+    assert scale in [2, 3, 4]
+    if scale == 2:
+        assert denoise in ['conservative', "1", "2", "3", None]
+        model = UpCunet2x()
+    elif scale == 3:
+        assert denoise in ['conservative', "3", None]
+        model = UpCunet3x()
+    elif scale == 4:
+        assert denoise in ['conservative', "3", None]
+        model = UpCunet4x()
+    denoise = {
+        "1": "denoise1x",
+        "2": "denoise2x",
+        "3": "denoise3x",
+        None: "no-denoise",
+        "conservative": "conservative"
+    }[denoise]
+    state_dict = flow.load(f"oneflow/weights/up{scale}x-latest-{denoise}")
+    model.load_state_dict(state_dict=state_dict, strict=True)
+    return model
 
 
 def str2bool(v):
@@ -840,15 +868,16 @@ if __name__ == "__main__":
     oneflow.backends.cudnn.set_reserved_mem_mbytes(3000)
     for weight_path, scale in [("weights/up2x-latest-denoise3x", 2)]:
         for tile_mode in [0]:
-            upscaler2x = RealWaifuUpScaler(scale,
-                                           weight_path,
-                                           half=args.fp16,
-                                           device="cuda:0",
-                                           real_data=args.real_data,
-                                           graph=args.graph,
-                                           pretrained=args.pretrain,
-                                           profile=args.profile,
-                                           conv_cudnn_search=args.conv_cudnn_search)
+            upscaler2x = RealWaifuUpScaler(
+                scale,
+                weight_path,
+                half=args.fp16,
+                device="cuda:0",
+                real_data=args.real_data,
+                graph=args.graph,
+                pretrained=args.pretrain,
+                profile=args.profile,
+                conv_cudnn_search=args.conv_cudnn_search)
 
             if args.real_data:
                 input_dir = "%s/input_dir1" % root_path

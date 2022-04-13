@@ -114,3 +114,5 @@ ENV/
 #vscode
 
 .vscode/
+
+test_imgs/
