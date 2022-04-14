@@ -10,6 +10,6 @@ output_names = ["output1"]
 torch.onnx.export(model,
                   dummy_input,
                   "realcugan.onnx",
-                  verbose=True,
+                  verbose=False,
                   input_names=input_names,
                   output_names=output_names)

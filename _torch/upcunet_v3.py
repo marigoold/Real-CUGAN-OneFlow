@@ -438,7 +438,7 @@ class UpCunet3x(nn.Module):  # 完美tile，全程无损
         self.unet1 = UNet1x3(in_channels, out_channels, deconv=True)
         self.unet2 = UNet2(in_channels, out_channels, deconv=False)
 
-    def forward(self, x, tile_mode):  # 1.7G
+    def forward(self, x, tile_mode=0):  # 1.7G
         n, c, h0, w0 = x.shape
         if (tile_mode == 0):  # 不tile
             ph = ((h0 - 1) // 4 + 1) * 4
@@ -590,7 +590,7 @@ class UpCunet4x(nn.Module):  # 完美tile，全程无损
         self.ps = nn.PixelShuffle(2)
         self.conv_final = nn.Conv2d(64, 12, 3, 1, padding=0, bias=True)
 
-    def forward(self, x, tile_mode):
+    def forward(self, x, tile_mode=0):
         n, c, h0, w0 = x.shape
         x00 = x
         if (tile_mode == 0):  # 不tile
