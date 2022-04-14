@@ -1,4 +1,3 @@
-from oneflow_onnx.oneflow2onnx.flow2onnx import Export
 from oneflow_onnx.oneflow2onnx.util import export_onnx_model
 from model import UpScalarGraph
 from utils import np2flow
@@ -12,7 +11,7 @@ graph = UpScalarGraph(scale=2,
 
 import cv2
 
-img = np2flow(cv2.imread("test_imgs/test-img.jpeg"), "cpu")
+img = np2flow(cv2.imread("../test_imgs/test-img.jpeg"), "cpu")
 result = graph(img)
 
 export_onnx_model(graph,

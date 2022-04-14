@@ -292,15 +292,14 @@ class UpCunet2x(nn.Module):  # 完美tile，全程无损
                       'reflect')  # 需要保证被2整除
             torch.cuda.nvtx.range_push("unet1")
             x = self.unet1.forward(x)
-            return x
             torch.cuda.nvtx.range_pop()
             torch.cuda.nvtx.range_push("unet2")
             x0 = self.unet2.forward(x)
             torch.cuda.nvtx.range_pop()
             x1 = F.pad(x, (-20, -20, -20, -20))
             x = torch.add(x, x)
-            if (w0 != pw or h0 != ph):
-                x = x[:, :, :h0 * 2, :w0 * 2]
+            # if (w0 != pw or h0 != ph):
+            #     x = x[:, :, :h0 * 2, :w0 * 2]
 
             return x0
         elif (tile_mode == 1):  # 对长边减半

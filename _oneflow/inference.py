@@ -3,6 +3,7 @@ import cv2
 import argparse
 from pathlib import Path
 import oneflow as flow
+import oneflow.profiler
 from utils import np2flow, flow2np
 
 if __name__ == "__main__":
@@ -28,13 +29,18 @@ if __name__ == "__main__":
         denoise=args.denoise,
         device="cuda",
         fp16=args.fp16,
-        tensorrt=False,
+        tensorrt=args.tensorrt,
         conv_cudnn_search=False,
     )
 
     if not Path(args.input).exists():
         raise FileExistsError("The input image doesn't exist! ")
-    image = cv2.imread(args.input)
+    image = np2flow(cv2.imread(args.input), "cuda")
 
-    result = flow2np(upscaler(np2flow(image, "cuda")))
+    oneflow.profiler.range_push('training_steps')
+    # oneflow.profiler.profiler_start()
+    result = flow2np(upscaler(image))
+    oneflow.profiler.range_pop()
+    # oneflow.profiler.profiler_stop()
+
     cv2.imwrite(args.output, result)

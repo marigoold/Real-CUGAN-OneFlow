@@ -116,3 +116,5 @@ ENV/
 .vscode/
 
 test_imgs/
+*.nsys-rep
+*.sqlite
