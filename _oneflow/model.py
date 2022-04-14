@@ -1,5 +1,4 @@
 import oneflow as flow
-from torch import tensor
 from upcunet_v3 import get_cunet
 
 

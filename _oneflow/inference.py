@@ -1,9 +1,9 @@
-from upcunet_v3 import RealWaifuUpScaler, np2tensor, tensor2np
 from model import UpScalarGraph
 import cv2
 import argparse
 from pathlib import Path
 import oneflow as flow
+from utils import np2flow, flow2np
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -16,21 +16,12 @@ if __name__ == "__main__":
     parser.add_argument('--fp16',
                         action="store_true",
                         help="whether to use amp inference")
+    parser.add_argument('--tensorrt',
+                        action="store_true",
+                        help="whether to use tensorrt")
     parser.add_argument('--output', help="the path of output image")
 
     args = parser.parse_args()
-    upscaler = RealWaifuUpScaler(
-        scale=args.scale,
-        denoise=args.denoise,
-        # weight_path=f"weights/oneflow/up{args.scale}x-latest-denoise3x",
-        half=args.fp16,
-        device="cuda:0",
-        real_data=True,
-        graph=True,
-        # pretrained=True,
-        profile=False,
-        conv_cudnn_search=False,
-    )
 
     upscaler = UpScalarGraph(
         scale=args.scale,
@@ -45,5 +36,5 @@ if __name__ == "__main__":
         raise FileExistsError("The input image doesn't exist! ")
     image = cv2.imread(args.input)
 
-    result = tensor2np(upscaler(np2tensor(image, "cuda")))
+    result = flow2np(upscaler(np2flow(image, "cuda")))
     cv2.imwrite(args.output, result)

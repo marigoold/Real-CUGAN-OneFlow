@@ -1,9 +1,3 @@
-from ast import arg
-import profile
-from turtle import forward
-
-from torch import tensor
-from graph import EvalGraph
 import oneflow
 import oneflow as flow
 from oneflow import nn as nn
@@ -819,7 +813,7 @@ def get_cunet(scale, denoise=None, return_weight_path=False):
         None: "no-denoise",
         "conservative": "conservative"
     }[denoise]
-    weight_path = f"oneflow/weights/up{scale}x-latest-{denoise}"
+    weight_path = f"weights/oneflow/up{scale}x-latest-{denoise}"
     state_dict = flow.load(weight_path)
     model.load_state_dict(state_dict=state_dict, strict=True)
     if not return_weight_path:
