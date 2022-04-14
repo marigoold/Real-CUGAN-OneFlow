@@ -15,9 +15,6 @@ if __name__ == "__main__":
     parser.add_argument('--fp16',
                         action="store_true",
                         help="whether to use amp inference")
-    parser.add_argument('--tensorrt',
-                        action="store_true",
-                        help="whether to use tensorrt")
     parser.add_argument('--output', help="the path of output image")
 
     args = parser.parse_args()
@@ -28,6 +25,10 @@ if __name__ == "__main__":
         raise FileExistsError("The input image doesn't exist! ")
     image = np2torch(cv2.imread(args.input), "cuda")
 
-    result = torch2np(upscaler(image))
+    if args.fp16:
+        upscaler = upscaler.half().cuda()
+        image = image.half()
+
+    result = torch2np(upscaler(image).float())
 
     cv2.imwrite(args.output, result)

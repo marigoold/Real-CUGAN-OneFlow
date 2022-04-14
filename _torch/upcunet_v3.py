@@ -32,7 +32,8 @@ class SEBlock(nn.Module):
         # if ("Half" in x.type()):  # torch.HalfTensor/torch.cuda.HalfTensor
         #     x0 = torch.mean(x.float(), dim=(2, 3), keepdim=True).half()
         # else:
-        x0 = torch.mean(x, dim=(2, 3), keepdim=True)
+        # x0 = torch.mean(x, dim=(2, 3), keepdim=True)
+        x0 = torch.mean(x.float(), dim=(2, 3), keepdim=True).type(x.type())
         x0 = self.conv1(x0)
         x0 = F.relu(x0, inplace=True)
         x0 = self.conv2(x0)
