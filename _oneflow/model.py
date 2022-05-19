@@ -31,8 +31,9 @@ class UpScalarGraph(flow.nn.Graph):
         if fp16:
             self.config.enable_amp(True)
             if tensorrt:
-                self.model.config.enable_tensorrt()
-                self.model.config.tensorrt.use_fp16()
+                import ipdb; ipdb.set_trace()
+                self.config.enable_tensorrt()
+                # self.model.config.tensorrt.use_fp16()
 
         self.config.enable_cudnn_conv_heuristic_search_algo(conv_cudnn_search)
 

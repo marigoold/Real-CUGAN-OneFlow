@@ -1,8 +1,11 @@
+from time import time
 from model import UpScalarGraph
 import cv2
 import argparse
 from pathlib import Path
 import oneflow as flow
+import oneflow.tensorrt
+# from oneflow.contrib import *
 import oneflow.profiler
 from utils import np2flow, flow2np
 
@@ -37,10 +40,20 @@ if __name__ == "__main__":
         raise FileExistsError("The input image doesn't exist! ")
     image = np2flow(cv2.imread(args.input), "cuda")
 
-    oneflow.profiler.range_push('training_steps')
-    # oneflow.profiler.profiler_start()
+    # for i in range(10):
     result = flow2np(upscaler(image))
-    oneflow.profiler.range_pop()
-    # oneflow.profiler.profiler_stop()
+    
+    flow.tensorrt.write_int8_calibration("./int8_calibration") # int8_calibration目录需要手动创建
+    # flow.tensorrt.cache_int8_calibration() # int8_calibration目录需要手动创建
+
+
+    # oneflow.profiler.range_push('training_steps')
+    # # oneflow.profiler.profiler_start()
+    # start_time = time()
+    # for i in range(100):
+    #     result = flow2np(upscaler(image))
+    # print(f"{time() - start_time:.4f}s")
+    # oneflow.profiler.range_pop()
+    # # oneflow.profiler.profiler_stop()
 
     cv2.imwrite(args.output, result)

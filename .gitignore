@@ -28,7 +28,7 @@ wheels/
 tmp/
 weight_v3/
 input_dir1/
-weights/
+# weights/
 test_img/
 opt-dir-all-test/
 *.pth
