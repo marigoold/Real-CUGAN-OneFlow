@@ -29,7 +29,6 @@ tmp/
 weight_v3/
 input_dir1/
 # weights/
-test_img/
 opt-dir-all-test/
 *.pth
 *.onnx
@@ -115,6 +114,5 @@ ENV/
 
 .vscode/
 
-test_imgs/
 *.nsys-rep
 *.sqlite
